@@ -83,15 +83,27 @@ jobs:
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'pull_request' && 'stage' || 'prod' }}
     strategy:
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Nuon CLI
+        run: |
+          curl -fsSL https://nuon-artifacts.s3.us-west-2.amazonaws.com/cli/install.sh -o "$RUNNER_TEMP/nuon-install.sh"
+          bash "$RUNNER_TEMP/nuon-install.sh" --no-input
+
+      - name: Write Nuon config
+        env:
+          NUON_CONFIG: ${{ secrets.NUON_CONFIG }}
+        run: |
+          printf '%s\n' "$NUON_CONFIG" > "$HOME/.nuon"
+          chmod 600 "$HOME/.nuon"
+
       - name: Sync ${{ matrix.app }}
-        uses: nuonco/actions-nuon@v0.2.0
-        with:
-          org_id: ${{ secrets.NUON_ORG_ID }}
-          api_token: ${{ secrets.NUON_API_TOKEN }}
-          command: apps sync -d ${{ matrix.app }} --create
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          nuon apps sync "$APP" --create

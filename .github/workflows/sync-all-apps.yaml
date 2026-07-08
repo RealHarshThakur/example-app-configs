@@ -3,8 +3,16 @@ name: Sync All Nuon Apps
 on:
   workflow_dispatch:
     inputs:
-      org_id:
-        description: "Nuon org ID (defaults to repo variable NUON_ORG_ID)"
+      environment:
+        description: "Environment to sync against (config comes from its NUON_CONFIG secret)"
+        required: false
+        type: choice
+        options:
+          - stage
+          - prod
+        default: prod
+      ref:
+        description: "Branch, tag, or SHA of example-app-configs to sync (default: this ref)"
         required: false
         type: string
         default: ""
@@ -13,18 +21,17 @@ on:
         required: false
         type: string
         default: ""
-      dry_run:
-        description: "Run without --create"
-        required: false
-        type: boolean
-        default: false
 
   schedule:
     - cron: "0 6 * * *"
 
   workflow_call:
     inputs:
-      org_id:
+      environment:
+        type: string
+        required: false
+        default: prod
+      ref:
         type: string
         required: false
         default: ""
@@ -32,12 +39,8 @@ on:
         type: string
         required: false
         default: ""
-      dry_run:
-        type: boolean
-        required: false
-        default: false
     secrets:
-      NUON_API_TOKEN:
+      NUON_CONFIG:
         required: true
 
 permissions:
@@ -53,22 +56,10 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       has_apps: ${{ steps.set-matrix.outputs.has_apps }}
-      org_id: ${{ steps.cfg.outputs.org_id }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve org_id
-        id: cfg
-        env:
-          INPUT_ORG_ID: ${{ inputs.org_id }}
-          VAR_ORG_ID: ${{ vars.NUON_ORG_ID }}
-        run: |
-          ORG_ID="${INPUT_ORG_ID:-$VAR_ORG_ID}"
-          if [ -z "$ORG_ID" ]; then
-            echo "::error::no org_id provided and NUON_ORG_ID repo variable is not set"
-            exit 1
-          fi
-          echo "org_id=$ORG_ID" >> "$GITHUB_OUTPUT"
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Discover apps
         id: set-matrix
@@ -120,19 +111,33 @@ jobs:
     needs: discover
     if: needs.discover.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'prod' }}
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false
       max-parallel: 4
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Install Nuon CLI
+        run: |
+          curl -fsSL https://nuon-artifacts.s3.us-west-2.amazonaws.com/cli/install.sh -o "$RUNNER_TEMP/nuon-install.sh"
+          bash "$RUNNER_TEMP/nuon-install.sh" --no-input
+
+      - name: Write Nuon config
+        env:
+          NUON_CONFIG: ${{ secrets.NUON_CONFIG }}
+        run: |
+          printf '%s\n' "$NUON_CONFIG" > "$HOME/.nuon"
+          chmod 600 "$HOME/.nuon"
 
       - name: Sync ${{ matrix.app }}
-        uses: nuonco/actions-nuon@v0.2.0
-        with:
-          org_id: ${{ needs.discover.outputs.org_id }}
-          api_token: ${{ secrets.NUON_API_TOKEN }}
-          command: apps sync -d ${{ matrix.app }} ${{ inputs.dry_run && '' || '--create' }}
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          nuon apps sync "$APP" --create
 
   summary:
     needs: [discover, sync]
@@ -143,14 +148,14 @@ jobs:
         env:
           MATRIX: ${{ needs.discover.outputs.matrix }}
           SYNC_RESULT: ${{ needs.sync.result }}
-          ORG_ID: ${{ needs.discover.outputs.org_id }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          ENVIRONMENT: ${{ inputs.environment || 'prod' }}
+          REF: ${{ inputs.ref || github.ref }}
         run: |
           {
             echo "## Sync All Nuon Apps"
             echo ""
-            echo "- **Org:** \`$ORG_ID\`"
-            echo "- **Dry run:** \`$DRY_RUN\`"
+            echo "- **Environment:** \`$ENVIRONMENT\`"
+            echo "- **Ref:** \`$REF\`"
             echo "- **Sync job result:** \`$SYNC_RESULT\`"
             echo ""
             echo "### Apps"

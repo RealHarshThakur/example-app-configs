@@ -61,6 +61,14 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
+# Non-secret example tfvars committed for CI sync testing.
+!aca-simple/sandbox.tfvars
+!eks-simple-kustomize/sandbox.tfvars
+!gke-actions/sandbox.tfvars
+!gke-secrets/sandbox.tfvars
+!gke-workload-identity/sandbox.tfvars
+!n8n/sandbox.tfvars
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
