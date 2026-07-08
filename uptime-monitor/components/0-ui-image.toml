@@ -4,5 +4,5 @@ type = "container_image"
 max_auto_retries = 5
 
 [public]
-image_url = "ghcr.io/nuonco/uptime-monitor-ui"
+image_url = "public.ecr.aws/p7e3r5y0/uptime-monitor-ui"
 tag       = "latest"
