@@ -9,3 +9,12 @@ enabled        = true
 category       = "architecture"
 difficulty     = "simple"
 cloud_provider = "aws"
+
+[customer_managed]
+runner_image_url = "public.ecr.aws/q9u4e4f3/runner"
+runner_image_tag = "e2e-cm-0.1"
+
+[[customer_managed.platforms]]
+target            = "linux/amd64"
+portal_binary_url = "http://localhost:8081/artifacts/bundle-portal-linux-amd64"
+runner_binary_url = "http://localhost:8081/artifacts/runner-linux-amd64"
