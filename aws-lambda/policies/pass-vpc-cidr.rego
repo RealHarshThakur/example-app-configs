@@ -43,3 +43,8 @@ pass contains msg if {
         [resource.address, cidr],
     )
 }
+
+warn contains msg if {
+    not pass
+    msg := "sandbox VPC does not use a private CIDR block"
+}

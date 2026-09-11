@@ -22,3 +22,8 @@ pass contains msg if {
         [count(azs)],
     )
 }
+
+warn contains msg if {
+    not pass
+    msg := "sandbox subnets are not distributed across multiple availability zones"
+}
